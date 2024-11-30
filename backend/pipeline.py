@@ -18,7 +18,7 @@ class ETLPipeline:
         try:
             # Read CSV file with specific handling for each type
             if file_type == 'mtr':
-                df = pd.read_csv(file_path, parse_dates=['Invoice Date', 'Shipment Date', 'Order Date'])
+                df = pd.read_excel(file_path, parse_dates=['Invoice Date', 'Shipment Date', 'Order Date'])
                 # Clean up column names
                 df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
             else:  # payment

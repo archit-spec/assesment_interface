@@ -1,15 +1,17 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 import pandas as pd
 from datetime import datetime, date
-from typing import List, Optional
+from typing import List, Optional, Dict
 import logging
 import json
 from pathlib import Path
 import shutil
 import os
+import uuid
 from models import (
     UnprocessedData, 
     ProcessedData, 
@@ -34,6 +36,9 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+# Global storage for processing jobs
+processing_jobs: Dict[str, dict] = {}
 
 app = FastAPI()
 
@@ -185,7 +190,7 @@ async def upload_payment(
 @app.get("/unprocessed", response_model=PaginatedResponse)
 async def list_unprocessed(
     page: int = Query(1, gt=0),
-    size: int = Query(10, gt=0, le=100),
+    size: int = Query(10, gt=0, le=300),
     file_type: Optional[str] = None,
     status: Optional[str] = None,
     db: Session = Depends(get_db)
@@ -212,7 +217,7 @@ async def list_unprocessed(
 @app.get("/processed", response_model=PaginatedResponse)
 async def list_processed(
     page: int = Query(1, gt=0),
-    size: int = Query(10, gt=0, le=100),
+    size: int = Query(10, gt=0, le=300),
     file_type: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
@@ -374,7 +379,7 @@ async def upload_file(report_type: str, file: UploadFile = File(...)):
             )
             
         # Validate file size (max 10MB)
-        max_size = 10 * 1024 * 1024  # 10MB in bytes
+        max_size = 100 * 1024 * 1024  # 10MB in bytes
         contents = await file.read()
         if len(contents) > max_size:
             raise HTTPException(
