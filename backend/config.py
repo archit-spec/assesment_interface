@@ -6,8 +6,8 @@ API settings, and environment-specific configurations.
 
 import logging
 import os
-from typing import Optional
 from pathlib import Path
+from typing import Optional
 
 # Configure logging
 logging.basicConfig(
@@ -23,16 +23,17 @@ API_PORT = int(os.getenv("API_PORT", "8000"))
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "1000"))
 MAX_WORKERS = 4
 
+
 # Database configuration
 def get_database_url() -> str:
     """Get database URL based on environment.
-    
+
     Returns:
         Database connection URL string.
     """
     # Check if running on Railway
     is_railway = bool(os.getenv("RAILWAY_ENVIRONMENT"))
-    
+
     if is_railway:
         # Use internal hostname for Railway PostgreSQL
         host = "postgres.railway.internal"
@@ -40,16 +41,12 @@ def get_database_url() -> str:
         db = os.getenv("PGDATABASE", "railway")
         user = os.getenv("PGUSER", "postgres")
         password = os.getenv("PGPASSWORD", "")
-        
-        return (
-            f"postgresql://{user}:{password}@{host}:{port}/{db}"
-        )
-    
+
+        return f"postgresql://{user}:{password}@{host}:{port}/{db}"
+
     # Use provided DATABASE_URL or default local
-    return os.getenv(
-        "DATABASE_URL",
-        "postgresql://dumball:tammu123@db:5432/accha"
-    )
+    return os.getenv("DATABASE_URL", "postgresql://dumball:tammu123@db:5432/accha")
+
 
 # Set database URL
 DATABASE_URL = get_database_url()
