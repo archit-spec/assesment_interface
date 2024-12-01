@@ -1,21 +1,45 @@
-import pandas as pd
+"""ETL pipeline for processing data files.
+
+This module implements the Extract, Transform, Load (ETL) pipeline for
+processing various types of data files. It handles file reading,
+data transformation, and database operations.
+"""
+
 import json
-from datetime import datetime
-from typing import Dict, Any, List
-from models import UnprocessedData, ProcessedData, get_db
-from sqlalchemy.orm import Session
 import logging
+from datetime import datetime
+from typing import Any, Dict, List
+
+import pandas as pd
+from sqlalchemy.orm import Session
+
 from config import BATCH_SIZE
+from models import ProcessedData, UnprocessedData, get_db
 
 logger = logging.getLogger(__name__)
 
 
 class ETLPipeline:
+    """ETL pipeline for processing data files."""
+
     def __init__(self, db: Session):
+        """Initialize ETL pipeline.
+
+        Args:
+            db: Database session for data persistence.
+        """
         self.db = db
 
     async def extract(self, file_path: str, file_type: str) -> UnprocessedData:
-        """Extract data from file and store in unprocessed table"""
+        """Extract data from file and store in unprocessed table.
+
+        Args:
+            file_path: Path to the file to extract.
+            file_type: Type of file (e.g., 'mtr', 'payment').
+
+        Returns:
+            UnprocessedData record.
+        """
         try:
             # Read CSV file with specific handling for each type
             if file_type == "mtr":
@@ -61,7 +85,14 @@ class ETLPipeline:
             raise
 
     def transform_mtr(self, data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Transform MTR data"""
+        """Transform MTR data.
+
+        Args:
+            data: Raw MTR data.
+
+        Returns:
+            Transformed MTR data.
+        """
         df = pd.DataFrame(data)
 
         # Specific transformations for MTR data
@@ -85,7 +116,14 @@ class ETLPipeline:
         return json.loads(df.to_json(orient="records", date_format="iso"))
 
     def transform_payment(self, data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Transform payment data"""
+        """Transform payment data.
+
+        Args:
+            data: Raw payment data.
+
+        Returns:
+            Transformed payment data.
+        """
         try:
             df = pd.DataFrame(data)
             logger.info(f"Payment data columns: {df.columns.tolist()}")
@@ -137,7 +175,15 @@ class ETLPipeline:
     def calculate_summary(
         self, data: List[Dict[str, Any]], file_type: str
     ) -> Dict[str, Any]:
-        """Calculate summary statistics"""
+        """Calculate summary statistics.
+
+        Args:
+            data: Processed data.
+            file_type: Type of file (e.g., 'mtr', 'payment').
+
+        Returns:
+            Summary statistics.
+        """
         try:
             df = pd.DataFrame(data)
             logger.info(f"Calculating summary for {file_type} data")
@@ -247,7 +293,17 @@ class ETLPipeline:
         summary: Dict[str, Any],
         file_type: str,
     ) -> ProcessedData:
-        """Load processed data into processed table"""
+        """Load processed data into processed table.
+
+        Args:
+            unprocessed_id: ID of the unprocessed record.
+            processed_data: Processed data to load.
+            summary: Summary statistics to load.
+            file_type: Type of file (e.g., 'mtr', 'payment').
+
+        Returns:
+            ProcessedData record.
+        """
         try:
             processed = ProcessedData(
                 unprocessed_id=unprocessed_id,
@@ -276,7 +332,14 @@ class ETLPipeline:
             raise
 
     async def process_file(self, unprocessed_id: int) -> ProcessedData:
-        """Process a single file through the ETL pipeline"""
+        """Process a single file through the ETL pipeline.
+
+        Args:
+            unprocessed_id: ID of the unprocessed record.
+
+        Returns:
+            ProcessedData record.
+        """
         try:
             # Get unprocessed record
             unprocessed = (

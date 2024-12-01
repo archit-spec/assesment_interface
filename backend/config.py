@@ -1,52 +1,65 @@
-import os
-from pathlib import Path
-import logging
+"""Configuration module for the application.
 
-# Database configuration
-logging.basicConfig(level=logging.INFO)
+This module handles all configuration settings including database connection,
+API settings, and environment-specific configurations.
+"""
+
+import logging
+import os
+from typing import Optional
+from pathlib import Path
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
 logger = logging.getLogger(__name__)
 
-# Check if we're running on Railway
-is_railway = os.getenv("RAILWAY_ENVIRONMENT") == "production"
+# Environment configuration
+DEBUG_MODE = os.getenv("DEBUG", "False").lower() == "true"
+API_HOST = os.getenv("API_HOST", "0.0.0.0")
+API_PORT = int(os.getenv("API_PORT", "8000"))
+BATCH_SIZE = int(os.getenv("BATCH_SIZE", "1000"))
+MAX_WORKERS = 4
 
-# Log environment
-logger.info(f"Running on Railway: {is_railway}")
-logger.info("Environment variables:")
-for var in ["DATABASE_URL", "DATABASE_PUBLIC_URL", "PGHOST", "PGUSER", "PGPASSWORD", "PGDATABASE", "PGPORT"]:
-    logger.info(f"{var}: {os.getenv(var, 'not set')}")
+# Database configuration
+def get_database_url() -> str:
+    """Get database URL based on environment.
+    
+    Returns:
+        Database connection URL string.
+    """
+    # Check if running on Railway
+    is_railway = bool(os.getenv("RAILWAY_ENVIRONMENT"))
+    
+    if is_railway:
+        # Use internal hostname for Railway PostgreSQL
+        host = "postgres.railway.internal"
+        port = os.getenv("PGPORT", "5432")
+        db = os.getenv("PGDATABASE", "railway")
+        user = os.getenv("PGUSER", "postgres")
+        password = os.getenv("PGPASSWORD", "")
+        
+        return (
+            f"postgresql://{user}:{password}@{host}:{port}/{db}"
+        )
+    
+    # Use provided DATABASE_URL or default local
+    return os.getenv(
+        "DATABASE_URL",
+        "postgresql://dumball:tammu123@db:5432/accha"
+    )
 
-if is_railway:
-    # Use Railway's internal database URL for better performance and security
-    DATABASE_URL = os.getenv("DATABASE_URL")  # This uses the internal connection URL
-    if not DATABASE_URL:
-        # Fallback to constructing URL from individual vars
-        db_user = os.getenv("PGUSER", "postgres")
-        db_pass = os.getenv("PGPASSWORD")
-        db_host = os.getenv("PGHOST", "postgres.railway.internal")
-        db_port = os.getenv("PGPORT", "5432")
-        db_name = os.getenv("PGDATABASE", "railway")
-        DATABASE_URL = f"postgresql://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
-    logger.info("Using Railway database configuration")
-else:
-    # Use Docker Compose configuration
-    DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://dumball:tammu123@db:5432/accha")
-    logger.info("Using Docker Compose database configuration")
+# Set database URL
+DATABASE_URL = get_database_url()
 
-logger.info(f"Final DATABASE_URL: {DATABASE_URL}")
+# File upload settings
+UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "uploads"))
+PROCESSED_DIR = Path(os.getenv("PROCESSED_DIR", "processed"))
 
-# File storage configuration
-UPLOAD_DIR = Path("uploads")
-PROCESSED_DIR = Path("processed")
-
-# Ensure directories exist
+# Create directories if they don't exist
 UPLOAD_DIR.mkdir(exist_ok=True)
 PROCESSED_DIR.mkdir(exist_ok=True)
 
-# Processing configuration
-BATCH_SIZE = 1000
-MAX_WORKERS = 4
-
-# API configuration
-API_HOST = "0.0.0.0"
-API_PORT = 8000
-DEBUG_MODE = True
+logger.info("Configuration loaded successfully")

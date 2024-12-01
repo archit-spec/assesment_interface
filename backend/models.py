@@ -1,18 +1,37 @@
-# model for the datbase
-from datetime import datetime, date
-from typing import List, Optional, Any, Dict
-from pydantic import BaseModel
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, JSON, Text
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
-from config import DATABASE_URL
+"""Database models and schemas for the application.
+
+This module contains SQLAlchemy models for database tables and Pydantic models
+for API request/response validation.
+"""
+
 import logging
 import os
+from datetime import date, datetime
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel
+from sqlalchemy import JSON, Column, DateTime, Integer, String, Text, create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+
+from config import DATABASE_URL
 
 Base = declarative_base()
 
 
 class UnprocessedData(Base):
+    """Model for storing raw unprocessed data files.
+
+    Attributes:
+        id: Unique identifier for the record
+        filename: Name of the uploaded file
+        file_type: Type of the file (mtr or payment)
+        upload_timestamp: When the file was uploaded
+        raw_data: JSON representation of the raw data
+        status: Current processing status
+        error_message: Error message if processing failed
+    """
+
     __tablename__ = "unprocessed"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -25,6 +44,18 @@ class UnprocessedData(Base):
 
 
 class ProcessedData(Base):
+    """Model for storing processed data files.
+
+    Attributes:
+        id: Unique identifier for the record
+        unprocessed_id: Reference to the original unprocessed record
+        processing_timestamp: When the data was processed
+        processed_data: JSON representation of the processed data
+        summary: Summary statistics of the processed data
+        status: Processing status
+        file_type: Type of the processed file
+    """
+
     __tablename__ = "processed"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -36,8 +67,9 @@ class ProcessedData(Base):
     file_type = Column(String)  # 'mtr' or 'payment'
 
 
-# Pydantic models for API responses
 class UnprocessedDataResponse(BaseModel):
+    """API response model for unprocessed data records."""
+
     id: int
     filename: str
     file_type: str
@@ -46,10 +78,14 @@ class UnprocessedDataResponse(BaseModel):
     error_message: Optional[str] = None
 
     class Config:
+        """Pydantic configuration for ORM mode."""
+
         from_attributes = True
 
 
 class ProcessedDataResponse(BaseModel):
+    """API response model for processed data records."""
+
     id: int
     unprocessed_id: int
     processing_timestamp: datetime
@@ -58,10 +94,14 @@ class ProcessedDataResponse(BaseModel):
     file_type: str
 
     class Config:
+        """Pydantic configuration for ORM mode."""
+
         from_attributes = True
 
 
 class PaginatedResponse(BaseModel):
+    """Generic paginated response model."""
+
     items: List[Any]
     total: int
     page: int
@@ -70,11 +110,15 @@ class PaginatedResponse(BaseModel):
 
 
 class TransactionTypeStats(BaseModel):
+    """Statistics for a specific transaction type."""
+
     count: int
     total_amount: float
 
 
 class TransactionSummary(BaseModel):
+    """Summary of transaction statistics."""
+
     total_records: int
     total_amount: float
     transaction_types: Dict[str, TransactionTypeStats]
@@ -83,6 +127,8 @@ class TransactionSummary(BaseModel):
 
 
 class TransactionQuery(BaseModel):
+    """Query parameters for transaction filtering."""
+
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     transaction_type: Optional[str] = None
@@ -101,23 +147,22 @@ logger.info(f"Attempting to connect to database with URL: {DATABASE_URL}")
 try:
     # Check if we're running on Railway
     is_railway = os.getenv("RAILWAY_ENVIRONMENT") == "production"
-    
     connect_args = {
         "connect_timeout": 30,
         "keepalives": 1,
         "keepalives_idle": 30,
         "keepalives_interval": 10,
         "keepalives_count": 5,
-        "application_name": "backend"
+        "application_name": "backend",
     }
-    
     # Only add SSL requirements for Railway
     if is_railway:
-        connect_args.update({
-            "sslmode": "prefer",
-            "options": "-c search_path=public"
-        })
-    
+        connect_args.update(
+            {
+                "sslmode": "prefer",  # Allow both SSL and non-SSL for internal connections
+                "options": "-c search_path=public",
+            }
+        )
     engine = create_engine(
         DATABASE_URL,
         pool_pre_ping=True,
@@ -125,7 +170,7 @@ try:
         max_overflow=20,
         pool_timeout=30,
         pool_recycle=300,
-        connect_args=connect_args
+        connect_args=connect_args,
     )
     logger.info("Database engine created successfully")
 except Exception as e:
@@ -144,6 +189,11 @@ except Exception as e:
 
 
 def get_db():
+    """Provide a transactional scope around a series of operations.
+
+    Yields:
+        Session: Database session
+    """
     db = SessionLocal()
     try:
         yield db

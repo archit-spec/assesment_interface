@@ -1,29 +1,37 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Query
+"""FastAPI application for processing data files.
+
+This module implements the main FastAPI application with endpoints for
+file upload, data processing, and query operations.
+"""
+
+import json
+import logging
+import os
+import shutil
+import uuid
+from datetime import date, datetime
+from pathlib import Path
+from typing import Dict, Any, Optional, List
+
+import pandas as pd
+from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy.orm import Session
 from sqlalchemy import desc
-import pandas as pd
-from datetime import datetime, date
-from typing import List, Optional, Dict
-import logging
-import json
-from pathlib import Path
-import shutil
-import os
-import uuid
+from sqlalchemy.orm import Session
+
+from config import API_HOST, API_PORT, DEBUG_MODE, UPLOAD_DIR
 from models import (
-    UnprocessedData,
-    ProcessedData,
-    UnprocessedDataResponse,
-    ProcessedDataResponse,
     PaginatedResponse,
-    TransactionSummary,
+    ProcessedData,
+    ProcessedDataResponse,
     TransactionQuery,
+    TransactionSummary,
+    UnprocessedData,
+    UnprocessedDataResponse,
     get_db,
 )
 from pipeline import ETLPipeline
-from config import UPLOAD_DIR, API_HOST, API_PORT, DEBUG_MODE
 
 # Configure logging
 logging.basicConfig(
@@ -31,13 +39,12 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[logging.FileHandler("app.log"), logging.StreamHandler()],
 )
-
 logger = logging.getLogger(__name__)
 
 # Global storage for processing jobs
 processing_jobs: Dict[str, dict] = {}
 
-app = FastAPI()
+app = FastAPI(title="Data Processing API", version="1.0.0")
 
 # Add CORS middleware
 app.add_middleware(
@@ -50,7 +57,10 @@ app.add_middleware(
 
 
 @app.post("/upload/mtr", response_model=UnprocessedDataResponse)
-async def upload_mtr(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_mtr(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
     """Upload and process MTR file"""
     try:
         # Log request details
@@ -119,7 +129,10 @@ async def upload_mtr(file: UploadFile = File(...), db: Session = Depends(get_db)
 
 
 @app.post("/upload/payment", response_model=UnprocessedDataResponse)
-async def upload_payment(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_payment(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
     """Upload and process payment file"""
     try:
         # Log request details
@@ -194,7 +207,7 @@ async def list_unprocessed(
     file_type: Optional[str] = None,
     status: Optional[str] = None,
     db: Session = Depends(get_db),
-):
+) -> Dict[str, Any]:
     """List unprocessed files with pagination"""
     query = db.query(UnprocessedData)
 
@@ -221,7 +234,7 @@ async def list_processed(
     size: int = Query(10, gt=0, le=300),
     file_type: Optional[str] = None,
     db: Session = Depends(get_db),
-):
+) -> Dict[str, Any]:
     """List processed files with pagination"""
     query = db.query(ProcessedData)
 
@@ -241,7 +254,10 @@ async def list_processed(
 
 
 @app.get("/processed/{id}", response_model=ProcessedDataResponse)
-async def get_processed(id: int, db: Session = Depends(get_db)):
+async def get_processed(
+    id: int,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
     """Get a specific processed file by ID"""
     processed = db.query(ProcessedData).filter(ProcessedData.id == id).first()
     if not processed:
@@ -255,7 +271,7 @@ async def get_summary(
     end_date: Optional[date] = None,
     transaction_type: Optional[str] = None,
     db: Session = Depends(get_db),
-):
+) -> Dict[str, Any]:
     """Get summary statistics for processed transactions"""
     try:
         # Get all processed records
@@ -304,7 +320,7 @@ async def get_transactions(
     page: int = Query(1, gt=0),
     size: int = Query(50, gt=0, le=1000),
     db: Session = Depends(get_db),
-):
+) -> Dict[str, Any]:
     """Get paginated transactions from all processed files"""
     try:
         # Get all processed records
@@ -347,7 +363,10 @@ async def get_transactions(
 
 
 @app.get("/api/transaction/{order_id}")
-async def get_transaction(order_id: str, db: Session = Depends(get_db)):
+async def get_transaction(
+    order_id: str,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
     """Get detailed information for a specific transaction"""
     try:
         # Search through processed records for the order
@@ -366,7 +385,10 @@ async def get_transaction(order_id: str, db: Session = Depends(get_db)):
 
 
 @app.post("/api/upload/{report_type}")
-async def upload_file(report_type: str, file: UploadFile = File(...)):
+async def upload_file(
+    report_type: str,
+    file: UploadFile = File(...),
+) -> Dict[str, Any]:
     """Handle file upload and initiate processing"""
     try:
         # Validate file type
@@ -474,7 +496,9 @@ async def upload_file(report_type: str, file: UploadFile = File(...)):
 
 
 @app.get("/api/status/{job_id}")
-async def get_status(job_id: str):
+async def get_status(
+    job_id: str,
+) -> Dict[str, Any]:
     """Get processing status and results"""
     if job_id not in processing_jobs:
         raise HTTPException(status_code=404, detail="Job not found")
