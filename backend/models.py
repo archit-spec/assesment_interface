@@ -6,6 +6,8 @@ from sqlalchemy import create_engine, Column, Integer, String, DateTime, JSON, T
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from config import DATABASE_URL
+import logging
+import os
 
 Base = declarative_base()
 
@@ -91,11 +93,54 @@ class TransactionQuery(BaseModel):
 
 
 # Database setup
-engine = create_engine(DATABASE_URL)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+logger.info(f"Attempting to connect to database with URL: {DATABASE_URL}")
+
+try:
+    # Check if we're running on Railway
+    is_railway = os.getenv("RAILWAY_ENVIRONMENT") == "production"
+    
+    connect_args = {
+        "connect_timeout": 30,
+        "keepalives": 1,
+        "keepalives_idle": 30,
+        "keepalives_interval": 10,
+        "keepalives_count": 5,
+        "application_name": "backend"
+    }
+    
+    # Only add SSL requirements for Railway
+    if is_railway:
+        connect_args.update({
+            "sslmode": "prefer",
+            "options": "-c search_path=public"
+        })
+    
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,
+        pool_size=10,
+        max_overflow=20,
+        pool_timeout=30,
+        pool_recycle=300,
+        connect_args=connect_args
+    )
+    logger.info("Database engine created successfully")
+except Exception as e:
+    logger.error(f"Error creating engine: {e}")
+    raise
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Create all tables
-Base.metadata.create_all(bind=engine)
+try:
+    Base.metadata.create_all(bind=engine)
+    logger.info("Database tables created successfully")
+except Exception as e:
+    logger.error(f"Error creating tables: {e}")
+    raise
 
 
 def get_db():
