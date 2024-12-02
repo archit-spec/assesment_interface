@@ -11,7 +11,10 @@ upload:
 curl -X POST -F "file=@Payment Report Sheet - Hiring - Sheet1.csv" http://localhost:8000/upload/Payment
 curl -X POST -F file=@"Merchant Tax Report (MTR) Sheet - Hiring.xlsx" http://localhost:8000/api/upload/mtr
 ```
-
+i have hosted the app service you can try here:
+```
+curl "http://144.24.132.202:8000/api/transactions?page=1&size=50"
+```
 processed : curl "http://localhost:8000/processed?page=1&size=10"
 
 unprocessed : curl "http://localhost:8000/unprocessed?page=1&size=10"
