@@ -1,4 +1,9 @@
 apis
+to run
+
+```bash
+docker compose up --build -d
+```
 
 first upload the data
 upload:
